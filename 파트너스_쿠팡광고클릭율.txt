@@ -1,0 +1,67 @@
+with stat as
+(
+SELECT CASE WHEN O.year = '2022' THEN '1_partners' END AS requestkey 
+      ,O.daily, O.nid, O.newcategory, O.c_click, V.c_view
+FROM (
+    SELECT year, concat(year,'-',month,'-',day) daily, nid, newcategory, count(*) as c_click
+    FROM   elasticsearch_parquet
+    WHERE 1=1
+    AND    CONCAT(year,'-',month,'-',day)>=date_format((now()- interval '1' day),'%Y-%m-%d')
+    AND  type = 'CONTINUE-READING-COUPANG-CLICK'
+    AND  level in (60,61,65)
+    GROUP BY year,concat(year,'-',month,'-',day), nid, newcategory
+    ) O,
+    (
+    SELECT  year,concat(year,'-',month,'-',day) daily, nid, newcategory, count(*) as c_view
+    FROM   elasticsearch_parquet
+    WHERE 1=1
+    AND    CONCAT(year,'-',month,'-',day)>=date_format((now()- interval '1' day),'%Y-%m-%d')
+    AND  type = 'CONTINUE-READING-COUPANG-VIEW'
+    AND  level in (60,61,65) 
+    GROUP BY  year, concat(year,'-',month,'-',day), nid, newcategory
+    ) V
+WHERE 1=1
+AND   O.year= V.year
+AND   O.daily= V.daily
+AND   O.nid= V.nid
+AND   O.newcategory= V.newcategory
+order by requestkey, daily
+)
+, list as
+(
+select S.*,  S.newcategory, NC.code_name, PN.title
+from  stat S,
+      (SELECT nid, title, author
+       FROM  picnews
+       WHERE  month = 07
+       ) PN,
+       (SELECT code, code_name
+         FROM   news_Cate
+        ) NC
+WHERE 1=1
+AND   S.nid = PN.nid
+AND   S.newcategory= NC.code
+)
+, VISIT  AS
+(
+SELECT  nid, COUNT(*) as visit
+FROM   elasticsearch_parquet
+WHERE  1=1
+ AND    CONCAT(year,'-',month,'-',day)>=date_format((now()- interval '1' day),'%Y-%m-%d')
+AND    type = 'VISIT'
+AND    level in (60,61,65)
+GROUP BY nid
+)
+, SHARE AS
+(
+SELECT nid, COUNT(*) as p_share
+FROM   elasticsearch_parquet
+WHERE  1=1
+ AND    CONCAT(year,'-',month,'-',day)>=date_format((now()- interval '1' day),'%Y-%m-%d')
+AND    type = 'PARTNERS_SHARE_CLICK'
+AND    level in (60,61,65)
+GROUP BY nid
+)
+SELECT L.*, V.visit, S.p_share
+FROM   list  L  left join VISIT   V  on L.nid = V.nid
+                   left join SHARE S  on L.nid = S.nid
