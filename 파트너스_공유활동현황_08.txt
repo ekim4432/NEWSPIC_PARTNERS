@@ -1,0 +1,19 @@
+WITH T1 AS
+(
+SELECT CONCAT(year,'-',month) m, requestkey,  count(*) share
+FROM   elasticsearch_parquet
+WHERE  1=1
+AND    CONCAT(year,'-',month)>='2022-03'   AND  CONCAT(year,'-',month)<='2022-08'
+AND    level in (60,61,65) 
+AND    type = 'PARTNERS_SHARE_CLICK'
+GROUP BY CONCAT(year,'-',month), requestkey
+)
+, T2 AS
+(
+SELECT *
+    , rank() over(partition by requestkey order by m ) as rank
+FROM   T1
+) 
+SELECT  *
+FROM   T2
+WHERE  rank =6
