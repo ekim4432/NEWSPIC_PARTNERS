@@ -1,0 +1,25 @@
+-- 지난 7일동안 DPV 5만PV가 넘은 파트너스의 7일동안의 페이지뷰 
+WITH V2 AS
+(
+SELECT *
+FROM (
+    SELECT CONCAT(year,'-',month,'-',day) day, requestkey, publisher, count(*) as visit
+    FROM  elasticsearch_parquet
+    WHERE 1=1
+    AND    CONCAT(year,'-',month,'-',day)>=date_format((now()- interval '7' day),'%Y-%m-%d')
+    AND    type = 'VISIT'
+    AND    level in (60,61,65)
+    GROUP BY CONCAT(year,'-',month,'-',day), requestkey, publisher
+    ) V
+WHERE  V.visit>=50000 -- 지난 7일동안 5만PV가 넘은 파트너스
+)
+SELECT requestkey, publisher,
+      sum(case when day= date_format((now()- interval '1' day),'%Y-%m-%d')then visit end) as "1일전", --1일전
+      sum(case when day= date_format((now()- interval '2' day),'%Y-%m-%d')then visit end) as "2일전", --2일전
+      sum(case when day= date_format((now()- interval '3' day),'%Y-%m-%d')then visit end) as "3일전", --
+      sum(case when day= date_format((now()- interval '4' day),'%Y-%m-%d')then visit end) as "4일전",
+      sum(case when day= date_format((now()- interval '5' day),'%Y-%m-%d')then visit end) as "5일전",
+      sum(case when day= date_format((now()- interval '6' day),'%Y-%m-%d')then visit end) as "6일전",
+      sum(case when day= date_format((now()- interval '7' day),'%Y-%m-%d')then visit end) as "7일전"  --7일전
+FROM   V2
+GROUP BY requestkey, publisher
