@@ -1,0 +1,31 @@
+-- 일주일동안 공유하기 활동을 한 파트너스들의 마지막 공유일자 
+WITH S AS
+(
+SELECT publisher, requestkey, DATE(from_unixtime(insertdate/1000) at time zone 'Asia/Seoul') DATE, COUNT() SHARE
+FROM  elasticsearch_parquet
+WHERE 1=1
+AND    CONCAT(year,'-',month,'-',day)>=date_format((now()- interval '7' day),'%Y-%m-%d')
+AND    type = 'PARTNERS_SHARE_CLICK'
+AND    level in (60,61,65)
+GROUP BY publisher, requestkey, DATE(from_unixtime(insertdate/1000) at time zone 'Asia/Seoul')
+)
+,V AS
+(
+SELECT publisher, requestkey, COUNT() VISIT
+FROM  elasticsearch_parquet
+WHERE 1=1
+AND    CONCAT(year,'-',month,'-',day)>=date_format((now()- interval '7' day),'%Y-%m-%d')
+AND    type = 'VISIT'
+AND    level in (60,61,65)
+GROUP BY publisher, requestkey
+)
+SELECT  S.publisher
+       ,S.requestkey
+       ,MIN(S.DATE) AS first_date
+       ,MAX(S.DATE) AS last_date
+       ,DATE(now()- interval '1' day)- MAX(S.DATE) DUE
+       ,SUM(S.SHARE) SHARE
+       ,SUM(V.VISIT) VISIT
+FROM   S INNER JOIN V ON S.publisher= V.publisher AND S.requestkey= V.requestkey
+GROUP BY S.publisher, S.requestkey, S.DATE
+
